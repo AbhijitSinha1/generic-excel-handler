@@ -1,0 +1,18 @@
+apply plugin: 'java-library'
+
+repositories {
+	mavenLocal()
+	mavenCentral()
+    jcenter()
+}
+
+dependencies {
+	compile group: 'org.apache.logging.log4j', name: 'log4j-api', version: '2.10.0'
+	compile group: 'org.apache.logging.log4j', name: 'log4j-slf4j-impl', version: '2.10.0'
+
+	// apache poi
+	compile group: 'org.apache.poi', name: 'poi', version: '3.17'
+
+    testImplementation 'junit:junit:4.12'
+}
+
