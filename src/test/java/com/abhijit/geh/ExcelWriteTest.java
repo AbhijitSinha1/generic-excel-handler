@@ -28,8 +28,8 @@ public class ExcelWriteTest {
 		LOGGER.info("starting application...");
 
 		Map<String, List<T>> outStudents = new HashMap<>();
-		List<T> students = (List<T>) generateStudets(RandomGenerator.integer(10, 100), Student.class);
-		List<T> teachers = (List<T>) generateTeachers(RandomGenerator.integer(10, 20), Teacher.class);
+		List<T> students = (List<T>) generateStudets(RandomGenerator.number(10, 100), Student.class);
+		List<T> teachers = (List<T>) generateTeachers(RandomGenerator.number(10, 20), Teacher.class);
 
 		outStudents.put("Students", students);
 		outStudents.put("Teachers", teachers);
@@ -44,26 +44,26 @@ public class ExcelWriteTest {
 	@SuppressWarnings("unchecked")
 	private static <T extends IExcelObject> T generateTeacher(Class<T> clz) {
 		Teacher teacher = new Teacher();
-		teacher.setGrade(RandomGenerator.integer(4, 10));
-		teacher.setName(RandomGenerator.string(RandomGenerator.integer(5, 10)));
-		teacher.setSchool(join(RandomGenerator.strings(RandomGenerator.integer(1, 3)), (a, b) -> a + " " + b));
+		teacher.setGrade(RandomGenerator.number(4, 10));
+		teacher.setName(RandomGenerator.string(RandomGenerator.number(5, 10)));
+		teacher.setSchool(join(RandomGenerator.strings(RandomGenerator.number(1, 3)), (a, b) -> a + " " + b));
 		teacher.setSection(RandomGenerator.character('A', 'B', 'C', 'D', 'E', 'F', 'G'));
-		teacher.setSubject(RandomGenerator.string(RandomGenerator.integer(5, 10)));
+		teacher.setSubject(RandomGenerator.string(RandomGenerator.number(5, 10)));
 		return (T) teacher;
 	}
 
 	@SuppressWarnings("unchecked")
 	private static <T extends IExcelObject> T generateStudent(Class<T> clz) {
 		Student student = new Student();
-		int grade = RandomGenerator.integer(4, 10);
+		int grade = RandomGenerator.number(4, 10);
 		int age = grade + 5;
 		student.setGrade(grade);
 		student.setAge(age);
 
-		student.setName(RandomGenerator.string(RandomGenerator.integer(5, 10)));
-		student.setFatherName(RandomGenerator.string(RandomGenerator.integer(5, 10)));
+		student.setName(RandomGenerator.string(RandomGenerator.number(5, 10)));
+		student.setFatherName(RandomGenerator.string(RandomGenerator.number(5, 10)));
 
-		student.setSchool(join(RandomGenerator.strings(RandomGenerator.integer(1, 3)), (a, b) -> a + " " + b));
+		student.setSchool(join(RandomGenerator.strings(RandomGenerator.number(1, 3)), (a, b) -> a + " " + b));
 		student.setSection(RandomGenerator.character('A', 'B', 'C', 'D'));
 
 		student.setHeight(RandomGenerator.number(3, 5));
