@@ -1,1 +1,3 @@
 rootProject.name = 'generic-excel-handler'
+include ':java-random-generator'
+project(':java-random-generator').projectDir = new File('../java-random-generator')
