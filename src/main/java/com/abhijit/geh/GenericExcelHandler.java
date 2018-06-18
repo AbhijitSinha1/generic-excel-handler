@@ -18,10 +18,12 @@ import java.util.Objects;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
-import org.apache.poi.hssf.usermodel.HSSFCell;
-import org.apache.poi.hssf.usermodel.HSSFRow;
-import org.apache.poi.hssf.usermodel.HSSFSheet;
 import org.apache.poi.hssf.usermodel.HSSFWorkbook;
+import org.apache.poi.ss.usermodel.Cell;
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -33,27 +35,31 @@ public class GenericExcelHandler {
 
 	private static final Logger LOGGER = LoggerFactory.getLogger(GenericExcelHandler.class);
 
-	private HSSFWorkbook workbook;
+	private Workbook workbook;
 
 	// constructors
 	// --------------------------------------------------------------------------------------------
-	private GenericExcelHandler(String path) throws IOException {
-		this(new File(path));
+	private GenericExcelHandler(String path, boolean newerVersion) throws IOException {
+		this(new File(path), newerVersion);
 	}
 
-	private GenericExcelHandler(File file) throws IOException {
-		this(new FileInputStream(file));
+	private GenericExcelHandler(File file, boolean newerVersion) throws IOException {
+		this(new FileInputStream(file), newerVersion);
 	}
 
-	private GenericExcelHandler(InputStream inputStream) throws IOException {
-		workbook = new HSSFWorkbook(inputStream);
+	private GenericExcelHandler(InputStream inputStream, boolean newerVersion) throws IOException {
+		if (newerVersion) {
+			workbook = new XSSFWorkbook(inputStream);
+		} else {
+			workbook = new HSSFWorkbook(inputStream);
+		}
 
 	}
 
 	// read methods
 	// ------------------------------------------------------------------------
 	public <T extends IExcelObject> List<T> read(String sheetName, Class<T> clz) {
-		HSSFSheet sheet = workbook.getSheet(sheetName);
+		Sheet sheet = workbook.getSheet(sheetName);
 		Map<String, Integer> header = generateHeader(sheet);
 		return generateData(sheet, header, clz);
 	}
@@ -61,11 +67,11 @@ public class GenericExcelHandler {
 	// write methods
 	// ------------------------------------------------------------------------
 	public static <T extends IExcelObject> void write(Map<String, List<T>> map, String path) throws IOException {
-		GenericExcelHandler.write(map, new File(path));
+		GenericExcelHandler.write(map, new File(path), isNewrVersion(path));
 	}
 
 	public static <T extends IExcelObject> void write(Map<String, List<T>> map, File file) throws IOException {
-		GenericExcelHandler.write(map, new FileOutputStream(file));
+		GenericExcelHandler.write(map, new FileOutputStream(file), isNewrVersion(file.getAbsolutePath()));
 	}
 
 	public static <T extends IExcelObject> void write(Map<String, List<T>> map, OutputStream outputStream)
@@ -85,47 +91,54 @@ public class GenericExcelHandler {
 
 	public static <T extends IExcelObject> void write(Map<String, List<T>> map, OutputStream outputStream,
 	        boolean newerVersion) throws IOException {
+		Workbook workbook;
+
 		if (newerVersion) {
-			throw new RuntimeException("Feature not implemented yet!");
+			workbook = new XSSFWorkbook();
 		} else {
-			HSSFWorkbook workbook = new HSSFWorkbook();
-			for (String sheetName : map.keySet()) {
-				LOGGER.debug("creating sheet: {}", sheetName);
-				HSSFSheet sheet = workbook.createSheet(sheetName);
-				populateSheet(sheet, map.get(sheetName));
-			}
-			workbook.write(outputStream);
-			workbook.close();
+			workbook = new HSSFWorkbook();
 		}
+
+		for (String sheetName : map.keySet()) {
+			LOGGER.debug("creating sheet: {}", sheetName);
+			Sheet sheet = workbook.createSheet(sheetName);
+			populateSheet(sheet, map.get(sheetName));
+		}
+		workbook.write(outputStream);
+		workbook.close();
 	}
 
 	// factory methods
 	// ------------------------------------------------------------------------
 	public static GenericExcelHandler of(String path) throws IOException {
-		return new GenericExcelHandler(path);
+		return new GenericExcelHandler(path, isNewrVersion(path));
 	}
 
 	public static GenericExcelHandler of(File file) throws IOException {
-		return new GenericExcelHandler(file);
+		return new GenericExcelHandler(file, isNewrVersion(file.getAbsolutePath()));
 	}
 
-	public static GenericExcelHandler of(InputStream inputStream) throws IOException {
-		return new GenericExcelHandler(inputStream);
+	public static GenericExcelHandler of(InputStream inputStream, boolean isNewerVersion) throws IOException {
+		return new GenericExcelHandler(inputStream, isNewerVersion);
 	}
 
 	// private helper methods
 	// ------------------------------------------------------------------------
-	private static <T extends IExcelObject> void populateSheet(HSSFSheet sheet, List<T> list) {
+	private static boolean isNewrVersion(String path) {
+		return path.endsWith(".xlsx");
+	}
+
+	private static <T extends IExcelObject> void populateSheet(Sheet sheet, List<T> list) {
 		Map<String, String> header = generateHeader(list.get(0));
 
 		LOGGER.debug("adding header row: {}", header);
-		HSSFRow headerRow = sheet.createRow(0);
+		Row headerRow = sheet.createRow(0);
 
 		populateRow(headerRow, header);
 
 		IntStream.range(0, list.size())
 		    .forEach(index -> {
-			    HSSFRow row = sheet.createRow(index + 1);
+			    Row row = sheet.createRow(index + 1);
 			    try {
 				    populateRow(row, list.get(index), header);
 			    } catch (NoSuchMethodException | SecurityException | IllegalAccessException | IllegalArgumentException
@@ -135,10 +148,10 @@ public class GenericExcelHandler {
 		    });
 	}
 
-	private static void populateRow(HSSFRow headerRow, Map<String, String> header) {
+	private static void populateRow(Row headerRow, Map<String, String> header) {
 		int cellIndex = 0;
 		for (String colHeader : header.keySet()) {
-			HSSFCell cell = headerRow.createCell(cellIndex);
+			Cell cell = headerRow.createCell(cellIndex);
 			cell.setCellValue(colHeader);
 			cellIndex++;
 		}
@@ -160,7 +173,7 @@ public class GenericExcelHandler {
 		return header;
 	}
 
-	private static <T extends IExcelObject> void populateRow(HSSFRow row, T t, Map<String, String> header)
+	private static <T extends IExcelObject> void populateRow(Row row, T t, Map<String, String> header)
 	        throws NoSuchMethodException, SecurityException, IllegalAccessException, IllegalArgumentException,
 	        InvocationTargetException, NoSuchFieldException {
 
@@ -177,7 +190,7 @@ public class GenericExcelHandler {
 			    .getMethod(getterMethodName);
 
 			Object value = getterMethod.invoke(t);
-			HSSFCell cell = row.createCell(cellIndex);
+			Cell cell = row.createCell(cellIndex);
 
 			if (type.getName()
 			    .equals("int") || type.equals(Integer.class)) {
@@ -214,7 +227,7 @@ public class GenericExcelHandler {
 		    .toUpperCase() + field.substring(1);
 	}
 
-	private <T extends IExcelObject> List<T> generateData(HSSFSheet sheet, Map<String, Integer> header, Class<T> clz) {
+	private <T extends IExcelObject> List<T> generateData(Sheet sheet, Map<String, Integer> header, Class<T> clz) {
 		return (List<T>) IntStream.rangeClosed(1, sheet.getLastRowNum())
 		    .boxed()
 		    .map(rowNumber -> sheet.getRow(rowNumber))
@@ -232,13 +245,13 @@ public class GenericExcelHandler {
 
 	}
 
-	private <T extends IExcelObject> T generatePojo(HSSFRow row, Map<String, Integer> header, Class<T> clz)
+	private <T extends IExcelObject> T generatePojo(Row row, Map<String, Integer> header, Class<T> clz)
 	        throws InstantiationException, IllegalAccessException, NoSuchMethodException, SecurityException,
 	        IllegalArgumentException, InvocationTargetException {
 		Map<String, Object> mapping = new HashMap<>();
 		for (String colName : header.keySet()) {
 			Integer colIndex = header.get(colName);
-			HSSFCell cell = row.getCell(colIndex);
+			Cell cell = row.getCell(colIndex);
 			switch (cell.getCellTypeEnum()) {
 				case _NONE: {
 				}
@@ -285,11 +298,11 @@ public class GenericExcelHandler {
 		return t;
 	}
 
-	private Map<String, Integer> generateHeader(HSSFSheet sheet) {
-		HSSFRow headerRow = sheet.getRow(0);
+	private Map<String, Integer> generateHeader(Sheet sheet) {
+		Row headerRow = sheet.getRow(0);
 		Map<String, Integer> header = new HashMap<>();
 		for (int i = 0; i < headerRow.getLastCellNum(); i++) {
-			HSSFCell cell = headerRow.getCell(i);
+			Cell cell = headerRow.getCell(i);
 			String colName = cell.getStringCellValue();
 			header.put(colName, i);
 		}
