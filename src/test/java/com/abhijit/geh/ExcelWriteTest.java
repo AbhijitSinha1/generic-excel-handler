@@ -11,7 +11,6 @@ import java.util.stream.IntStream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.abhijit.geh.GenericExcelHandler;
 import com.abhijit.geh.marker.IExcelObject;
 import com.abhijit.geh.pojo.Student;
 import com.abhijit.geh.pojo.Teacher;
@@ -20,7 +19,8 @@ import com.abhijit.jrg.RandomGenerator;
 public class ExcelWriteTest {
 
 	private static final Logger LOGGER = LoggerFactory.getLogger(ExcelWriteTest.class);
-	private static final String excelPath = "/home/abhijits/Work/project/generic_excel_reader/school_excel_file.xls";
+	private static final String xlsPath = "/home/abhijits/Work/project/generic_excel_reader/school_excel_file.xls";
+	private static final String xlsxPath = "/home/abhijits/Work/project/generic_excel_reader/school_excel_file.xlsx";
 
 	@SuppressWarnings("unchecked")
 	public static <T extends IExcelObject> void main(String[] args) throws IOException {
@@ -36,7 +36,13 @@ public class ExcelWriteTest {
 
 		LOGGER.info("writing {} student and {} teacher information", students.size(), teachers.size());
 
-		GenericExcelHandler.write(outStudents, excelPath);
+		extracted(outStudents, xlsPath);
+		extracted(outStudents, xlsxPath);
+	}
+
+	private static <T extends IExcelObject> void extracted(Map<String, List<T>> outStudents, String path)
+	        throws IOException {
+		GenericExcelHandler.write(outStudents, path);
 	}
 
 	// private helper methods
