@@ -15,6 +15,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
@@ -28,6 +29,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.abhijit.geh.annotations.GenericExcelColumn;
+import com.abhijit.geh.enums.FileFormat;
 import com.abhijit.geh.marker.IExcelObject;
 import com.abhijit.geh.utils.ClassCast;
 
@@ -39,16 +41,16 @@ public class GenericExcelHandler {
 
 	// constructors
 	// --------------------------------------------------------------------------------------------
-	private GenericExcelHandler(String path, boolean newerVersion) throws IOException {
-		this(new File(path), newerVersion);
+	private GenericExcelHandler(String path, FileFormat format) throws IOException {
+		this(new File(path), format);
 	}
 
-	private GenericExcelHandler(File file, boolean newerVersion) throws IOException {
-		this(new FileInputStream(file), newerVersion);
+	private GenericExcelHandler(File file, FileFormat format) throws IOException {
+		this(new FileInputStream(file), format);
 	}
 
-	private GenericExcelHandler(InputStream inputStream, boolean newerVersion) throws IOException {
-		if (newerVersion) {
+	private GenericExcelHandler(InputStream inputStream, FileFormat format) throws IOException {
+		if (format.equals(FileFormat.XLSX)) {
 			workbook = new XSSFWorkbook(inputStream);
 		} else {
 			workbook = new HSSFWorkbook(inputStream);
@@ -66,39 +68,64 @@ public class GenericExcelHandler {
 
 	// write methods
 	// ------------------------------------------------------------------------
-	public static <T extends IExcelObject> void write(Map<String, List<T>> map, String path) throws IOException {
-		GenericExcelHandler.write(map, new File(path), isNewrVersion(path));
+	public static <T extends IExcelObject> void write(Map<String, List<T>> map, String path, FileFormat format)
+			throws IOException {
+		GenericExcelHandler.write(map, new File(path), format);
 	}
 
-	public static <T extends IExcelObject> void write(Map<String, List<T>> map, File file) throws IOException {
-		GenericExcelHandler.write(map, new FileOutputStream(file), isNewrVersion(file.getAbsolutePath()));
-	}
-
-	public static <T extends IExcelObject> void write(Map<String, List<T>> map, OutputStream outputStream)
-	        throws IOException {
-		GenericExcelHandler.write(map, outputStream, false);
-	}
-
-	public static <T extends IExcelObject> void write(Map<String, List<T>> map, String path, boolean newerVersion)
-	        throws IOException {
-		GenericExcelHandler.write(map, new File(path), newerVersion);
-	}
-
-	public static <T extends IExcelObject> void write(Map<String, List<T>> map, File file, boolean newerVersion)
-	        throws IOException {
-		GenericExcelHandler.write(map, new FileOutputStream(file), newerVersion);
+	public static <T extends IExcelObject> void write(Map<String, List<T>> map, File file, FileFormat format)
+			throws IOException {
+		GenericExcelHandler.write(map, new FileOutputStream(file), format);
 	}
 
 	public static <T extends IExcelObject> void write(Map<String, List<T>> map, OutputStream outputStream,
-	        boolean newerVersion) throws IOException {
-		Workbook workbook;
-
-		if (newerVersion) {
-			workbook = new XSSFWorkbook();
-		} else {
-			workbook = new HSSFWorkbook();
+			FileFormat format) throws IOException {
+		switch (format) {
+		case XLS: {
+			writeToWorkbook(new XSSFWorkbook(), map, outputStream);
+		}
+			break;
+		case XLSX: {
+			writeToWorkbook(new HSSFWorkbook(), map, outputStream);
+		}
+			break;
+		case CSV: {
+			if (map.isEmpty()) {
+				throw new IllegalArgumentException("No data sent");
+			}
+			Set<String> keys = map.keySet();
+			String key = keys.iterator().next();
+			
+		}
+			break;
+		default: {
+		}
+			break;
 		}
 
+		if (format.equals(FileFormat.XLSX)) {
+		} else {
+		}
+	}
+
+	// factory methods
+	// ------------------------------------------------------------------------
+	public static GenericExcelHandler of(String filepath, FileFormat format) throws IOException {
+		return new GenericExcelHandler(new File(filepath), format);
+	}
+
+	public static GenericExcelHandler of(File file, FileFormat format) throws IOException {
+		return new GenericExcelHandler(new FileInputStream(file), format);
+	}
+
+	public static GenericExcelHandler of(InputStream inputStream, FileFormat format) throws IOException {
+		return new GenericExcelHandler(inputStream, format);
+	}
+
+	// writer methods
+	// ------------------------------------------------------------------------
+	private static <T extends IExcelObject> void writeToWorkbook(Workbook workbook, Map<String, List<T>> map,
+			OutputStream outputStream) throws IOException {
 		for (String sheetName : map.keySet()) {
 			LOGGER.debug("creating sheet: {}", sheetName);
 			Sheet sheet = workbook.createSheet(sheetName);
@@ -108,26 +135,12 @@ public class GenericExcelHandler {
 		workbook.close();
 	}
 
-	// factory methods
-	// ------------------------------------------------------------------------
-	public static GenericExcelHandler of(String path) throws IOException {
-		return new GenericExcelHandler(path, isNewrVersion(path));
-	}
+	private static <T extends IExcelObject> void writeToFile(List<T> list, OutputStream outputStream) {
 
-	public static GenericExcelHandler of(File file) throws IOException {
-		return new GenericExcelHandler(file, isNewrVersion(file.getAbsolutePath()));
-	}
-
-	public static GenericExcelHandler of(InputStream inputStream, boolean isNewerVersion) throws IOException {
-		return new GenericExcelHandler(inputStream, isNewerVersion);
 	}
 
 	// private helper methods
 	// ------------------------------------------------------------------------
-	private static boolean isNewrVersion(String path) {
-		return path.endsWith(".xlsx");
-	}
-
 	private static <T extends IExcelObject> void populateSheet(Sheet sheet, List<T> list) {
 		Map<String, String> header = generateHeader(list.get(0));
 
@@ -136,16 +149,15 @@ public class GenericExcelHandler {
 
 		populateRow(headerRow, header);
 
-		IntStream.range(0, list.size())
-		    .forEach(index -> {
-			    Row row = sheet.createRow(index + 1);
-			    try {
-				    populateRow(row, list.get(index), header);
-			    } catch (NoSuchMethodException | SecurityException | IllegalAccessException | IllegalArgumentException
-			            | InvocationTargetException | NoSuchFieldException e) {
-				    LOGGER.error("could not populate row: {}", e);
-			    }
-		    });
+		IntStream.range(0, list.size()).forEach(index -> {
+			Row row = sheet.createRow(index + 1);
+			try {
+				populateRow(row, list.get(index), header);
+			} catch (NoSuchMethodException | SecurityException | IllegalAccessException | IllegalArgumentException
+					| InvocationTargetException | NoSuchFieldException e) {
+				LOGGER.error("could not populate row: {}", e);
+			}
+		});
 	}
 
 	private static void populateRow(Row headerRow, Map<String, String> header) {
@@ -160,8 +172,7 @@ public class GenericExcelHandler {
 	private static <T extends IExcelObject> Map<String, String> generateHeader(T t) {
 		Map<String, String> header = new HashMap<>();
 
-		for (Field field : t.getClass()
-		    .getDeclaredFields()) {
+		for (Field field : t.getClass().getDeclaredFields()) {
 			if (!field.isAnnotationPresent(GenericExcelColumn.class)) {
 				LOGGER.debug("GenericExcelColumn annotation not found {}", field.getName());
 				continue;
@@ -174,37 +185,30 @@ public class GenericExcelHandler {
 	}
 
 	private static <T extends IExcelObject> void populateRow(Row row, T t, Map<String, String> header)
-	        throws NoSuchMethodException, SecurityException, IllegalAccessException, IllegalArgumentException,
-	        InvocationTargetException, NoSuchFieldException {
+			throws NoSuchMethodException, SecurityException, IllegalAccessException, IllegalArgumentException,
+			InvocationTargetException, NoSuchFieldException {
 
 		int cellIndex = 0;
 		for (String colHeader : header.keySet()) {
 			String fieldName = header.get(colHeader);
-			Field field = t.getClass()
-			    .getDeclaredField(fieldName);
+			Field field = t.getClass().getDeclaredField(fieldName);
 
 			Class<?> type = field.getType();
 
 			String getterMethodName = generateMethodName(fieldName, "get");
-			Method getterMethod = t.getClass()
-			    .getMethod(getterMethodName);
+			Method getterMethod = t.getClass().getMethod(getterMethodName);
 
 			Object value = getterMethod.invoke(t);
 			Cell cell = row.createCell(cellIndex);
 
-			if (type.getName()
-			    .equals("int") || type.equals(Integer.class)) {
+			if (type.getName().equals("int") || type.equals(Integer.class)) {
 				LOGGER.debug("{}: int", fieldName);
 				cell.setCellValue((Integer) value);
-			} else if (type.getName()
-			    .equals("double") || type.equals(Double.class)
-			        || type.getName()
-			            .equals("float")
-			        || type.equals(Float.class)) {
+			} else if (type.getName().equals("double") || type.equals(Double.class) || type.getName().equals("float")
+					|| type.equals(Float.class)) {
 				LOGGER.debug("{}: double", fieldName);
 				cell.setCellValue((Double) value);
-			} else if (type.getName()
-			    .equals("boolean") || type.equals(Boolean.class)) {
+			} else if (type.getName().equals("boolean") || type.equals(Boolean.class)) {
 				LOGGER.debug("{}: boolean", fieldName);
 				cell.setCellValue((Boolean) value);
 			} else if (type.equals(Date.class)) {
@@ -223,63 +227,58 @@ public class GenericExcelHandler {
 	}
 
 	private static String generateMethodName(String field, String prefix) {
-		return prefix + field.substring(0, 1)
-		    .toUpperCase() + field.substring(1);
+		return prefix + field.substring(0, 1).toUpperCase() + field.substring(1);
 	}
 
 	private <T extends IExcelObject> List<T> generateData(Sheet sheet, Map<String, Integer> header, Class<T> clz) {
-		return (List<T>) IntStream.rangeClosed(1, sheet.getLastRowNum())
-		    .boxed()
-		    .map(rowNumber -> sheet.getRow(rowNumber))
-		    .map(row -> {
-			    try {
-				    return generatePojo(row, header, clz);
-			    } catch (InstantiationException | IllegalAccessException | NoSuchMethodException | SecurityException
-			            | IllegalArgumentException | InvocationTargetException e) {
-				    LOGGER.error("error: {}", e);
-				    return null;
-			    }
-		    })
-		    .filter(Objects::nonNull)
-		    .collect(Collectors.toList());
+		return (List<T>) IntStream.rangeClosed(1, sheet.getLastRowNum()).boxed()
+				.map(rowNumber -> sheet.getRow(rowNumber)).map(row -> {
+					try {
+						return generatePojo(row, header, clz);
+					} catch (InstantiationException | IllegalAccessException | NoSuchMethodException | SecurityException
+							| IllegalArgumentException | InvocationTargetException e) {
+						LOGGER.error("error: {}", e);
+						return null;
+					}
+				}).filter(Objects::nonNull).collect(Collectors.toList());
 
 	}
 
 	private <T extends IExcelObject> T generatePojo(Row row, Map<String, Integer> header, Class<T> clz)
-	        throws InstantiationException, IllegalAccessException, NoSuchMethodException, SecurityException,
-	        IllegalArgumentException, InvocationTargetException {
+			throws InstantiationException, IllegalAccessException, NoSuchMethodException, SecurityException,
+			IllegalArgumentException, InvocationTargetException {
 		Map<String, Object> mapping = new HashMap<>();
 		for (String colName : header.keySet()) {
 			Integer colIndex = header.get(colName);
 			Cell cell = row.getCell(colIndex);
 			switch (cell.getCellTypeEnum()) {
-				case _NONE: {
-				}
-					break;
-				case BLANK: {
-					mapping.put(colName, "");
-				}
-					break;
-				case BOOLEAN: {
-					mapping.put(colName, cell.getBooleanCellValue());
-				}
-					break;
-				case ERROR: {
-					mapping.put(colName, cell.getErrorCellValue());
-				}
-					break;
-				case FORMULA: {
-					mapping.put(colName, cell.getCellFormula());
-				}
-					break;
-				case NUMERIC: {
-					mapping.put(colName, cell.getNumericCellValue());
-				}
-					break;
-				case STRING: {
-					mapping.put(colName, cell.getStringCellValue());
-				}
-					break;
+			case _NONE: {
+			}
+				break;
+			case BLANK: {
+				mapping.put(colName, "");
+			}
+				break;
+			case BOOLEAN: {
+				mapping.put(colName, cell.getBooleanCellValue());
+			}
+				break;
+			case ERROR: {
+				mapping.put(colName, cell.getErrorCellValue());
+			}
+				break;
+			case FORMULA: {
+				mapping.put(colName, cell.getCellFormula());
+			}
+				break;
+			case NUMERIC: {
+				mapping.put(colName, cell.getNumericCellValue());
+			}
+				break;
+			case STRING: {
+				mapping.put(colName, cell.getStringCellValue());
+			}
+				break;
 			}
 		}
 		T t = clz.newInstance();
